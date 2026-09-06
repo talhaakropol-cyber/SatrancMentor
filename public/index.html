@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Satranç Mentor - Lichess Koç</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 0.5rem;
+      color: #1a1a1a;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .games-list {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    .games-list h2 {
+      font-size: 16px;
+      margin-bottom: 1rem;
+      color: #1a1a1a;
+    }
+
+    .game-item {
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .game-item:hover {
+      background: #f9f9f9;
+      border-color: #ddd;
+    }
+
+    .game-item.active {
+      background: #e8f5e9;
+      border-color: #4caf50;
+      border-width: 2px;
+    }
+
+    .game-item-title {
+      font-weight: 500;
+      font-size: 14px;
+      margin-bottom: 0.25rem;
+    }
+
+    .game-item-meta {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .game-item-result {
+      float: right;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .analysis {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 2rem;
+    }
+
+    .analysis-section {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #eee;
+    }
+
+    .analysis-section:last-child {
+      border-bottom: none;
+    }
+
+    .analysis-label {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+    }
+
+    .analysis-value {
+      font-size: 16px;
+      color: #1a1a1a;
+      font-weight: 500;
+    }
+
+    .verdict {
+      font-size: 20px;
+      font-weight: bold;
+      margin: 0.5rem 0;
+    }
+
+    .verdict.win {
+      color: #4caf50;
+    }
+
+    .verdict.loss {
+      color: #f44336;
+    }
+
+    .verdict.draw {
+      color: #ff9800;
+    }
+
+    .lesson {
+      background: #f0f4ff;
+      border-left: 4px solid #2196f3;
+      padding: 1rem;
+      border-radius: 4px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #1a1a1a;
+      margin: 1rem 0;
+    }
+
+    .concepts {
+      background: #fff3e0;
+      border-left: 4px solid #ff9800;
+      padding: 1rem;
+      border-radius: 4px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #666;
+      margin: 1rem 0;
+    }
+
+    .tip {
+      background: #e8f5e9;
+      border-left: 4px solid #4caf50;
+      padding: 1rem;
+      border-radius: 4px;
+      font-size: 13px;
+      margin-top: 1rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #999;
+    }
+
+    .error {
+      background: #ffebee;
+      border: 1px solid #f44336;
+      color: #c62828;
+      padding: 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>♟ Satranç Mentor</h1>
+      <p class="subtitle">Lichess oyunlarını analiz eden yapay zeka koçu</p>
+    </header>
+
+    <div class="grid">
+      <div class="games-list" id="gamesList">
+        <h2>Son Oyunlar</h2>
+        <div class="loading">Oyunlar yükleniyor...</div>
+      </div>
+
+      <div class="analysis" id="analysis">
+        <div class="loading">Bir oyun seçin analiz görmek için</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    let games = [];
+    let currentGame = null;
+
+    async function loadGames() {
+      try {
+        const response = await fetch(`${API}/api/games`);
+        if (!response.ok) throw new Error('Oyunları yüklenirken hata');
+        
+        games = await response.json();
+        renderGamesList();
+        
+        if (games.length > 0) {
+          selectGame(games[0]);
+        }
+      } catch (error) {
+        document.getElementById('gamesList').innerHTML = 
+          `<div class="error">Hata: ${error.message}</div>`;
+      }
+    }
+
+    function renderGamesList() {
+      const listDiv = document.getElementById('gamesList');
+      listDiv.innerHTML = '<h2>Son Oyunlar</h2>';
+      
+      games.forEach(game => {
+        const resultEmoji = game.winner === null ? '=' : 
+                           (game.playerColor === 'white' ? 
+                            (game.winner === 'white' ? '⚪' : '⚫') :
+                            (game.winner === 'black' ? '⚫' : '⚪'));
+        
+        const item = document.createElement('div');
+        item.className = 'game-item';
+        item.innerHTML = `
+          <div class="game-item-title">
+            vs ${game.opponent}
+            <span class="game-item-result">${resultEmoji}</span>
+          </div>
+          <div class="game-item-meta">${game.date}</div>
+        `;
+        
+        item.addEventListener('click', () => selectGame(game));
+        listDiv.appendChild(item);
+      });
+    }
+
+    async function selectGame(game) {
+      currentGame = game;
+      
+      // Highlight aktif oyun
+      document.querySelectorAll('.game-item').forEach((item, idx) => {
+        item.classList.toggle('active', games[idx].id === game.id);
+      });
+
+      // Analiz yap
+      try {
+        const response = await fetch(`${API}/api/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ game })
+        });
+        
+        if (!response.ok) throw new Error('Analiz yapılırken hata');
+        
+        const analysis = await response.json();
+        renderAnalysis(analysis);
+      } catch (error) {
+        document.getElementById('analysis').innerHTML = 
+          `<div class="error">Hata: ${error.message}</div>`;
+      }
+    }
+
+    function renderAnalysis(analysis) {
+      const analysisDiv = document.getElementById('analysis');
+      
+      const verdictClass = analysis.verdict.includes('✓') ? 'win' : 
+                          analysis.verdict.includes('✗') ? 'loss' : 'draw';
+      
+      analysisDiv.innerHTML = `
+        <div class="analysis-section">
+          <div class="analysis-label">Tarih</div>
+          <div class="analysis-value">${analysis.date}</div>
+        </div>
+
+        <div class="analysis-section">
+          <div class="analysis-label">Sonuç</div>
+          <div class="verdict ${verdictClass}">${analysis.verdict}</div>
+          <div class="analysis-value" style="font-size: 13px; color: #666;">
+            ${analysis.clock} • vs ${analysis.opponent}
+          </div>
+        </div>
+
+        <div class="analysis-section">
+          <div class="analysis-label">Mentor Tavsiyesi</div>
+          <div class="lesson">${analysis.lesson}</div>
+        </div>
+
+        <div class="analysis-section">
+          <div class="analysis-label">Teorik Konseptler</div>
+          <div class="concepts">${analysis.concepts}</div>
+        </div>
+
+        <div class="tip">
+          <strong>💡 Tavsiye:</strong> Her oyunu bitirdikten sonra en zor pozisyonda farklı hamle yapmayı düşün.
+        </div>
+      `;
+    }
+
+    // Sayfayı yükle
+    loadGames();
+  </script>
+</body>
+</html>
